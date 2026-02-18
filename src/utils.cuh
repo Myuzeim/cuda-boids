@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cuda/std/array>
 
 namespace Hyperparams {
     constexpr float AVOID_FACTOR = .005f;
@@ -22,10 +23,6 @@ namespace Hyperparams {
 
     constexpr size_t FLOCK_SIZE = 60000;
 };
-
-namespace Universals {
-    constexpr unsigned int BOID_VERTICES = 12;
-}
 
 namespace DeviceHelpers {
     //helpers
@@ -57,6 +54,28 @@ namespace DeviceHelpers {
         float invLen = rnorm3df(a.x,a.y,a.z);
         return scale(a, invLen);
     }
+
+    __device__ inline cuda::std::array<float4,4> transform(float3 translate, float3 rotate) {
+        float3 normRotate = normalize(rotate);
+        cuda::std::array<float4,4> ret;
+        //column major
+        if (normRotate.y < -0.99f) {
+            //edge case
+            ret[0] = make_float4(1.0f,0.0f,0.0f,0.0f);
+            ret[1] = make_float4(0.0f,-1.0f,0.0f,0.0f);
+            ret[2] = make_float4(0.0f,0.0f,-1.0f,0.0f);
+            ret[3] = make_float4(translate.x,translate.y,translate.z,1.0f);
+        } else {
+            //ret[0] = {1-(normRotate.x*normRotate.x)/(1+normRotate.y), normRotate.x, -1*(normRotate.x*normRotate.z)/(1+normRotate.y), translate.x};
+            //ret[1] = {-1*normRotate.x, normRotate.y, -1*normRotate.z, translate.y};
+            //ret[2] = {-1*(normRotate.x*normRotate.z)/(1+normRotate.y), normRotate.z, 1-(normRotate.z*normRotate.z)/(1+normRotate.y), translate.z};
+            ret[0] = make_float4(1-(normRotate.x*normRotate.x)/(1+normRotate.y), -1*normRotate.x, -1*(normRotate.x*normRotate.z)/(1+normRotate.y), 0.0f);
+            ret[1] = make_float4(normRotate.x, normRotate.y, normRotate.z, 0.0f);
+            ret[2] = make_float4(-1*(normRotate.x*normRotate.z)/(1+normRotate.y), -1*normRotate.z, 1-(normRotate.z*normRotate.z)/(1+normRotate.y), 0.0f);
+            ret[3] = {translate.x,translate.y,translate.z,1.0f};
+        }
+        return ret;
+    };
 }
 
 struct Accumulator {

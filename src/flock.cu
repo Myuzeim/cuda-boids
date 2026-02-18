@@ -105,44 +105,18 @@ __global__ void updatePosit(Boid* boids, const size_t n) {
     }
 };
 
-__global__ void genVert(Boid* boids, float3* verts, const unsigned int n) {
+__global__ void genTransform(Boid* boids, float4* transforms, const unsigned int n) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if (i < n) {
-        float3 velNormal = DeviceHelpers::normalize(boids[i].getVeloc());
-        float3 cross1, cross2;
-        if (velNormal.y < .99) {
-            cross1 = DeviceHelpers::cross(velNormal, {0.0f,1.0f,0.0f});
-            cross2 = DeviceHelpers::cross(velNormal, cross1);
-        } else {
-            cross1 = DeviceHelpers::cross(velNormal, {1.0f,0.0f,0.0f});
-            cross2 = DeviceHelpers::cross(velNormal, cross1);
-        }
-        cross1 = DeviceHelpers::scale(cross1,.005f);
-        cross2 = DeviceHelpers::scale(cross2,.005f);
-        float3 velSmall = DeviceHelpers::scale(velNormal,.005f);
-        unsigned int vertIndex = i * Universals::BOID_VERTICES;
-        verts[vertIndex] = DeviceHelpers::add(boids[i].getPosit(),velSmall);
-        verts[vertIndex+1] = DeviceHelpers::add(boids[i].getPosit(),cross1);
-        verts[vertIndex+2] = DeviceHelpers::add(boids[i].getPosit(),cross2);
-
-        verts[vertIndex+3] = DeviceHelpers::add(boids[i].getPosit(),velSmall);
-        verts[vertIndex+4] = DeviceHelpers::add(boids[i].getPosit(),cross2);
-        verts[vertIndex+5] = DeviceHelpers::sub(boids[i].getPosit(),cross1);
-
-        verts[vertIndex+6] = DeviceHelpers::add(boids[i].getPosit(),velSmall);
-        verts[vertIndex+7] = DeviceHelpers::sub(boids[i].getPosit(),cross1);
-        verts[vertIndex+8] = DeviceHelpers::sub(boids[i].getPosit(),cross2);
-
-        verts[vertIndex+9] = DeviceHelpers::add(boids[i].getPosit(), velSmall);
-        verts[vertIndex+10] = DeviceHelpers::sub(boids[i].getPosit(), cross2);
-        verts[vertIndex+11] = DeviceHelpers::add(boids[i].getPosit(), cross1);
+        cuda::std::array<float4,4> toWrite = DeviceHelpers::transform(boids[i].getPosit(),boids[i].getVeloc());
+        memcpy(&transforms[i*4],&toWrite,sizeof(toWrite));
     }
 };
 
-void Flock::step(float3* verts) {
+void Flock::step(float4* transforms) {
     updateVeloc<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,Hyperparams::FLOCK_SIZE);
     updatePosit<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,Hyperparams::FLOCK_SIZE);
-    genVert<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,verts,Hyperparams::FLOCK_SIZE);
+    genTransform<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,transforms,Hyperparams::FLOCK_SIZE);
 };
 
 Flock::Flock() {

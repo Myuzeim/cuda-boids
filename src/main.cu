@@ -8,7 +8,8 @@
 
 const char* vertSrc = "#version 330 core\n"
     "layout(location = 0) in vec3 aPos;\n"
-    "void main() { gl_Position = vec4(aPos, 1.0); }\n";
+    "layout(location = 1) in mat4 instance;\n"
+    "void main() { gl_Position = instance * vec4(aPos, 1.0); }\n";
 
 const char* fragSrc = "#version 330 core\n"
     "out vec4 FragColor;\n"
@@ -68,29 +69,68 @@ int main() {
     glDeleteShader(vert);
     glDeleteShader(frag);
 
-    // Allocate Vertex Data
-    unsigned int VAO, VBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
+    // boid structure
+    float boidVerts[] = {
+        0.0f, 0.005f, 0.0f,
+        -0.002598f, 0.0f, -0.0015f,
+        0.0f, 0.0f, 0.003f,
 
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float3)*Hyperparams::FLOCK_SIZE*Universals::BOID_VERTICES, NULL, GL_DYNAMIC_DRAW);
+        0.0f, 0.005f, 0.0f,
+        0.002598f, 0.0f, -0.0015f,
+        -0.002598f, 0.0f, -0.0015f,
+
+        0.0f, 0.005f, 0.0f,
+        0.0f, 0.0f, 0.003f,
+        0.002598f, 0.0f, -0.0015f,
+
+        0.0f, 0.0f, 0.003f,
+        0.002598f, 0.0f, -0.0015f,
+        -0.002598f, 0.0f, -0.0015f,
+    };
+
+    // Allocate vertex data
+    unsigned int boidVAO, boidVBO;
+    glGenVertexArrays(1, &boidVAO);
+    glGenBuffers(1, &boidVBO);
+
+    glBindVertexArray(boidVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, boidVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float3)*12, boidVerts, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
     glEnableVertexAttribArray(0);
 
+    // Allocate instance data
+    unsigned int instVBO;
+    glGenBuffers(1, &instVBO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, instVBO);
+    size_t matSize = 4*sizeof(float4);
+    glBufferData(GL_ARRAY_BUFFER, matSize*Hyperparams::FLOCK_SIZE,nullptr,GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, matSize , nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, matSize , (void*)(1*sizeof(float4)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, matSize , (void*)(2*sizeof(float4)));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, matSize , (void*)(3*sizeof(float4)));
+    glEnableVertexAttribArray(4);
+
+    glVertexAttribDivisor(1,1);
+    glVertexAttribDivisor(2,1);
+    glVertexAttribDivisor(3,1);
+    glVertexAttribDivisor(4,1);
+
     //unbind for now
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
     
     // create boid data
     Flock flock;
     
     // register with cuda
     cudaGraphicsResource* cudaVBO;
-    cudaError_t err = cudaGraphicsGLRegisterBuffer(&cudaVBO, VBO, cudaGraphicsMapFlagsWriteDiscard);
+    cudaError_t err = cudaGraphicsGLRegisterBuffer(&cudaVBO, instVBO, cudaGraphicsMapFlagsWriteDiscard);
     if (err != cudaSuccess)
         std::cout << cudaGetErrorString(err) << std::endl;
-    
 
     double lastTime = glfwGetTime();
     int frameCount = 0;
@@ -98,19 +138,20 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         // run calculations
         size_t size;
-        float3* verts;
+        float4* transforms;
+        
         cudaGraphicsMapResources(1,&cudaVBO,0);
-        cudaGraphicsResourceGetMappedPointer((void**)&verts,&size,cudaVBO);
-
-        flock.step(verts);
-
+        cudaGraphicsResourceGetMappedPointer((void**)&transforms,&size,cudaVBO);
+        
+        flock.step(transforms);
+        
         cudaGraphicsUnmapResources(1, &cudaVBO, 0);
-
+        
         // draw
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(program);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, Hyperparams::FLOCK_SIZE*Universals::BOID_VERTICES);
+        glBindVertexArray(boidVAO);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 12, Hyperparams::FLOCK_SIZE);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
