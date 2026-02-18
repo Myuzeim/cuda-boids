@@ -9,7 +9,7 @@ namespace Hyperparams {
     constexpr float CENTERING_FACTOR = .0005f;
     constexpr float BUOY_SPEED = .002f;
 
-    constexpr float  VISION_DISTANCE = .1f;
+    constexpr float  VISION_DISTANCE = .3f;
     constexpr float  AVOID_DISTANCE = .03f;
     constexpr float  MAX_SPEED = .005f;
     constexpr float  MIN_SPEED = .003f;
@@ -21,7 +21,7 @@ namespace Hyperparams {
     constexpr float  LEFT_BOUND = -.95f;
     constexpr float  NEAR_BOUND = -.95f;
 
-    constexpr size_t FLOCK_SIZE = 60000;
+    constexpr size_t FLOCK_SIZE = 50000;
 };
 
 namespace DeviceHelpers {
@@ -76,7 +76,7 @@ namespace DeviceHelpers {
         }
         return ret;
     };
-}
+};
 
 struct Accumulator {
     float3 pos_avg{0.0f, 0.0f, 0.0f};

@@ -1,7 +1,11 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <cuda_gl_interop.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
+#include <algorithm>
 #include <iostream>
 
 #include "flock.cuh"
@@ -9,7 +13,9 @@
 const char* vertSrc = "#version 330 core\n"
     "layout(location = 0) in vec3 aPos;\n"
     "layout(location = 1) in mat4 instance;\n"
-    "void main() { gl_Position = instance * vec4(aPos, 1.0); }\n";
+    "uniform mat4 view;\n"
+    "uniform mat4 proj;\n"
+    "void main() { gl_Position = proj * view * instance * vec4(aPos, 1.0); }\n";
 
 const char* fragSrc = "#version 330 core\n"
     "out vec4 FragColor;\n"
@@ -52,6 +58,37 @@ int main() {
 
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     
+    // Set up camera
+    struct CamState {
+        float yaw = 0.f, pitch = 0.3f, dist = 5.f;
+        double lastX = 0, lastY = 0;
+        bool dragging = false;
+    };
+    CamState cam;
+    glfwSetWindowUserPointer(window, &cam);
+
+    glfwSetMouseButtonCallback(window, [](GLFWwindow* w, int btn, int action, int) {
+        auto& c = *(CamState*)glfwGetWindowUserPointer(w);
+        if (btn == GLFW_MOUSE_BUTTON_LEFT) {
+            c.dragging = (action == GLFW_PRESS);
+            glfwGetCursorPos(w, &c.lastX, &c.lastY);
+        }
+    });
+
+    glfwSetCursorPosCallback(window, [](GLFWwindow* w, double x, double y) {
+        auto& c = *(CamState*)glfwGetWindowUserPointer(w);
+        if (!c.dragging) return;
+        c.yaw   += (float)(x - c.lastX) * 0.005f;
+        c.pitch += (float)(y - c.lastY) * 0.005f;
+        c.pitch  = std::clamp(c.pitch, -1.5f, 1.5f); // don't flip over the poles
+        c.lastX = x; c.lastY = y;
+    });
+
+    glfwSetScrollCallback(window, [](GLFWwindow* w, double, double dy) {
+        auto& c = *(CamState*)glfwGetWindowUserPointer(w);
+        c.dist *= (float)std::pow(0.9, dy); // scroll up = zoom in
+        c.dist  = std::clamp(c.dist, 0.5f, 500.f);
+    });
 
     // Compile shaders
     unsigned int vert = glCreateShader(GL_VERTEX_SHADER);
@@ -68,6 +105,9 @@ int main() {
     glLinkProgram(program);
     glDeleteShader(vert);
     glDeleteShader(frag);
+
+    int uView = glGetUniformLocation(program, "view");
+    int uProj = glGetUniformLocation(program, "proj");
 
     // boid structure
     float boidVerts[] = {
@@ -146,6 +186,24 @@ int main() {
         flock.step(transforms);
         
         cudaGraphicsUnmapResources(1, &cudaVBO, 0);
+        
+        // Move camera
+        glm::vec3 eye(
+            cam.dist * cosf(cam.pitch) * sinf(cam.yaw),
+            cam.dist * sinf(cam.pitch),
+            cam.dist * cosf(cam.pitch) * cosf(cam.yaw)
+        );
+        glm::mat4 view = glm::lookAt(eye, glm::vec3(0), glm::vec3(0,1,0));
+        glm::mat4 proj = glm::perspective(
+            glm::radians(45.f),
+            (float)WINDOW_WIDTH / WINDOW_HEIGHT,
+            0.01f, 1000.f
+        );
+
+        glUseProgram(program);
+        glUniformMatrix4fv(uView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(uProj, 1, GL_FALSE, glm::value_ptr(proj));
+
         
         // draw
         glClear(GL_COLOR_BUFFER_BIT);
