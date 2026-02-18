@@ -117,9 +117,9 @@ __global__ void genVert(Boid* boids, float3* verts, const unsigned int n) {
             cross1 = DeviceHelpers::cross(velNormal, {1.0f,0.0f,0.0f});
             cross2 = DeviceHelpers::cross(velNormal, cross1);
         }
-        cross1 = DeviceHelpers::scale(cross1,.01f);
-        cross2 = DeviceHelpers::scale(cross2,.01f);
-        float3 velSmall = DeviceHelpers::scale(velNormal,.01f);
+        cross1 = DeviceHelpers::scale(cross1,.005f);
+        cross2 = DeviceHelpers::scale(cross2,.005f);
+        float3 velSmall = DeviceHelpers::scale(velNormal,.005f);
         unsigned int vertIndex = i * Universals::BOID_VERTICES;
         verts[vertIndex] = DeviceHelpers::add(boids[i].getPosit(),velSmall);
         verts[vertIndex+1] = DeviceHelpers::add(boids[i].getPosit(),cross1);

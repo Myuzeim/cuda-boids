@@ -13,14 +13,14 @@ namespace Hyperparams {
     constexpr float  MAX_SPEED = .005f;
     constexpr float  MIN_SPEED = .003f;
 
-    constexpr float  TOP_BOUND = .8f;
-    constexpr float  RIGHT_BOUND = .8f;
-    constexpr float  FAR_BOUND = .4f;
-    constexpr float  BOTTOM_BOUND = -.8f;
-    constexpr float  LEFT_BOUND = -.8f;
-    constexpr float  NEAR_BOUND = -.4f;
+    constexpr float  TOP_BOUND = .95f;
+    constexpr float  RIGHT_BOUND = .95f;
+    constexpr float  FAR_BOUND = .95f;
+    constexpr float  BOTTOM_BOUND = -.95f;
+    constexpr float  LEFT_BOUND = -.95f;
+    constexpr float  NEAR_BOUND = -.95f;
 
-    constexpr size_t FLOCK_SIZE = 10000;
+    constexpr size_t FLOCK_SIZE = 60000;
 };
 
 namespace Universals {

@@ -17,7 +17,6 @@ const char* fragSrc = "#version 330 core\n"
 // -- settings --
 const int    WINDOW_WIDTH  = 1280;
 const int    WINDOW_HEIGHT = 720;
-const char*  WINDOW_TITLE  = "Boids";
 
 void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -37,7 +36,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 
     GLFWwindow* window = glfwCreateWindow(
-        WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, nullptr, nullptr
+        WINDOW_WIDTH, WINDOW_HEIGHT, "Boids", nullptr, nullptr
     );
 
     if (!window) {
@@ -93,6 +92,9 @@ int main() {
         std::cout << cudaGetErrorString(err) << std::endl;
     
 
+    double lastTime = glfwGetTime();
+    int frameCount = 0;
+
     while (!glfwWindowShouldClose(window)) {
         // run calculations
         size_t size;
@@ -112,6 +114,18 @@ int main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        //fps
+        double currentTime = glfwGetTime();
+        frameCount++;
+        if (currentTime - lastTime >= 1.0) {
+            double fps = frameCount / (currentTime - lastTime);
+            char title[64];
+            snprintf(title,64,"Boids | FPS: %.1f", fps);
+            glfwSetWindowTitle(window, title);
+            frameCount = 0;
+            lastTime = currentTime;
+        }
     }
 
     
