@@ -3,17 +3,18 @@
 #include "boid.cuh"
 #include "utils.cuh"
 
-//input: a list of n boids.
-__global__ void updateVeloc(Boid* boids, const size_t n);
-__global__ void updatePosit(Boid* boids, const size_t n);
-__global__ void genTransform(Boid* boids, float3* verts, const unsigned int n);
-
 // a flock of boids
 // set # of boids in Hyperparams.FLOCK_SIZE
 class Flock {
     private:
         Boid* mpd_boids;
+        int* mpd_gridIndices;
+        int* mpd_gridStarts;
         Boid randomBoid();
+
+        size_t m_xGrids;
+        size_t m_yGrids;
+        size_t m_zGrids;
     
     public:
         void step(float4* transforms);

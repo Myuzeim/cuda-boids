@@ -15,7 +15,7 @@ const char* vertSrc = "#version 330 core\n"
     "layout(location = 1) in mat4 instance;\n"
     "uniform mat4 view;\n"
     "uniform mat4 proj;\n"
-    "void main() { gl_Position = proj * view * instance * vec4(aPos, 1.0); }\n";
+    "void main() { gl_Position = proj * view * instance * vec4(aPos*50, 1.0); }\n";
 
 const char* fragSrc = "#version 330 core\n"
     "out vec4 FragColor;\n"
@@ -60,7 +60,7 @@ int main() {
     
     // Set up camera
     struct CamState {
-        float yaw = 0.f, pitch = 0.3f, dist = 5.f;
+        float yaw = 0.f, pitch = 0.3f, dist = 300.f;
         double lastX = 0, lastY = 0;
         bool dragging = false;
     };

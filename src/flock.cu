@@ -1,6 +1,11 @@
 #include "flock.cuh"
 #include <random>
 #include <cmath>
+#include <cuda/std/cmath>
+
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
+#include <thrust/functional.h>
 
 Boid Flock::randomBoid() {
     static std::mt19937 rng(std::random_device{}());
@@ -25,25 +30,50 @@ Boid Flock::randomBoid() {
     return Boid(posit, veloc);
 };
 
-__global__ void updateVeloc(Boid* boids, const size_t n) {
+__global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts) {
     unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    if (idx < n) {
+    if (idx < Hyperparams::FLOCK_SIZE) {
         Accumulator accum;
-        for(int neighborIdx = 0; neighborIdx < Hyperparams::FLOCK_SIZE; neighborIdx++) {
-            
-            float3 d = DeviceHelpers::sub(boids[idx].getPosit(), boids[neighborIdx].getPosit());
-            float sqDist = d.x*d.x + d.y*d.y + d.z*d.z;
-            
-            if (sqDist < Hyperparams::AVOID_DISTANCE*Hyperparams::AVOID_DISTANCE) {
-                //Avoiding
-                accum.close = DeviceHelpers::add(accum.close, DeviceHelpers::sub(boids[idx].getPosit(),boids[neighborIdx].getPosit()));
-            } else if (sqDist < Hyperparams::VISION_DISTANCE*Hyperparams::VISION_DISTANCE) {
-                // Centering/Matching
-                accum.pos_avg = DeviceHelpers::add(accum.pos_avg, boids[neighborIdx].getPosit());
-                accum.vel_avg = DeviceHelpers::add(accum.vel_avg, boids[neighborIdx].getVeloc());
-                accum.neighboring_boids += 1;
-            }
-        }
+        
+        //surrounding 9 grids
+        for (int i = -1; i <= 1; i++)
+            for (int j = -1; j <= 1; j++)
+                for (int k = -1; k <= 1; k++)
+                {
+                    int neighborGridIdx = grids[idx] + i + j * Hyperparams::X_GRIDS + k * Hyperparams::X_GRIDS * Hyperparams::Y_GRIDS;
+                    if(neighborGridIdx < 0 || neighborGridIdx > Hyperparams::X_GRIDS * Hyperparams::Y_GRIDS * Hyperparams::Z_GRIDS)
+                        continue;
+                    
+                    //empty cell
+                    if(gridStarts[neighborGridIdx] == -1)
+                        continue;
+                        
+                    for(int neighborIdx = gridStarts[neighborGridIdx];neighborIdx < Hyperparams::FLOCK_SIZE;neighborIdx++)
+                    {
+
+                        //if we're out of the grid
+                        unsigned int x = cuda::std::floor((boids[neighborIdx].getPosit().x - Hyperparams::LEFT_BOUND) / Hyperparams::VISION_DISTANCE);
+                        unsigned int y = cuda::std::floor((boids[neighborIdx].getPosit().y - Hyperparams::BOTTOM_BOUND) / Hyperparams::VISION_DISTANCE);
+                        unsigned int z = cuda::std::floor((boids[neighborIdx].getPosit().z - Hyperparams::NEAR_BOUND) / Hyperparams::VISION_DISTANCE);
+
+                        if(neighborGridIdx != x + y * Hyperparams::X_GRIDS + z * Hyperparams::X_GRIDS * Hyperparams::Z_GRIDS)
+                            break;
+
+                        //get data for later
+                        float3 d = DeviceHelpers::sub(boids[idx].getPosit(), boids[neighborIdx].getPosit());
+                        float sqDist = d.x*d.x + d.y*d.y + d.z*d.z;
+
+                        if (sqDist < Hyperparams::AVOID_DISTANCE*Hyperparams::AVOID_DISTANCE) {
+                            //Avoiding
+                            accum.close = DeviceHelpers::add(accum.close, DeviceHelpers::sub(boids[idx].getPosit(),boids[neighborIdx].getPosit()));
+                        } else if (sqDist < Hyperparams::VISION_DISTANCE*Hyperparams::VISION_DISTANCE) {
+                            // Centering/Matching
+                            accum.pos_avg = DeviceHelpers::add(accum.pos_avg, boids[neighborIdx].getPosit());
+                            accum.vel_avg = DeviceHelpers::add(accum.vel_avg, boids[neighborIdx].getVeloc());
+                            accum.neighboring_boids += 1;
+                        }
+                    }
+                }
         
         float3 newVeloc = boids[idx].getVeloc();
 
@@ -68,20 +98,6 @@ __global__ void updateVeloc(Boid* boids, const size_t n) {
         newVeloc.y = newVeloc.y + accum.close.y*Hyperparams::AVOID_FACTOR;
         newVeloc.z = newVeloc.z + accum.close.z*Hyperparams::AVOID_FACTOR;
 
-        // buoy (bounce off sides)
-        if (boids[idx].getPosit().x < Hyperparams::LEFT_BOUND)
-            newVeloc.x += Hyperparams::BUOY_SPEED;
-        if (boids[idx].getPosit().x > Hyperparams::RIGHT_BOUND)
-            newVeloc.x -= Hyperparams::BUOY_SPEED;
-        if (boids[idx].getPosit().y < Hyperparams::BOTTOM_BOUND)
-            newVeloc.y += Hyperparams::BUOY_SPEED;
-        if (boids[idx].getPosit().y > Hyperparams::TOP_BOUND)
-            newVeloc.y -= Hyperparams::BUOY_SPEED;
-        if (boids[idx].getPosit().z < Hyperparams::FAR_BOUND)
-            newVeloc.z += Hyperparams::BUOY_SPEED;
-        if (boids[idx].getPosit().z > Hyperparams::NEAR_BOUND)
-            newVeloc.z -= Hyperparams::BUOY_SPEED;
-
         float invSpeed = rnorm3df(newVeloc.x, newVeloc.y, newVeloc.z);
         if ((1.0f / invSpeed) < Hyperparams::MIN_SPEED) {
             newVeloc.x = newVeloc.x * invSpeed * Hyperparams::MIN_SPEED;
@@ -98,25 +114,65 @@ __global__ void updateVeloc(Boid* boids, const size_t n) {
     }
 };
 
-__global__ void updatePosit(Boid* boids, const size_t n) {
+__global__ void updatePosit(Boid* boids) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if (i < n) {
+    if (i < Hyperparams::FLOCK_SIZE) {
         boids[i].step();
+        
     }
 };
 
-__global__ void genTransform(Boid* boids, float4* transforms, const unsigned int n) {
+__global__ void genTransform(Boid* boids, float4* transforms) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if (i < n) {
+    if (i < Hyperparams::FLOCK_SIZE) {
         cuda::std::array<float4,4> toWrite = DeviceHelpers::transform(boids[i].getPosit(),boids[i].getVeloc());
         memcpy(&transforms[i*4],&toWrite,sizeof(toWrite));
     }
 };
 
+__global__ void assignGrid(Boid* boids, int* indices) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if (i < Hyperparams::FLOCK_SIZE) {
+        unsigned int x = cuda::std::floor((boids[i].getPosit().x - Hyperparams::LEFT_BOUND) / Hyperparams::VISION_DISTANCE);
+        unsigned int y = cuda::std::floor((boids[i].getPosit().y - Hyperparams::BOTTOM_BOUND) / Hyperparams::VISION_DISTANCE);
+        unsigned int z = cuda::std::floor((boids[i].getPosit().z - Hyperparams::NEAR_BOUND) / Hyperparams::VISION_DISTANCE);
+
+        indices[i] = x + y * Hyperparams::X_GRIDS + z * Hyperparams::X_GRIDS * Hyperparams::Z_GRIDS;
+    }
+};
+
+__global__ void assignGridStarts(int* indices, int* starts) {
+    //only use one thread
+    //O(N) time but that shouldn't be a problem
+    
+    //initialize
+    for (int i = 0; i < Hyperparams::X_GRIDS * Hyperparams::Y_GRIDS * Hyperparams::Z_GRIDS;i++)
+    {
+        starts[i] = -1;
+    }
+
+    starts[0] = 0;
+    for (int i = 0; i < Hyperparams::FLOCK_SIZE; i++) {
+        if (i == 0 || indices[i] != indices[i-1]) {
+            starts[indices[i]] = i;
+        }
+    }
+};
+
 void Flock::step(float4* transforms) {
-    updateVeloc<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,Hyperparams::FLOCK_SIZE);
-    updatePosit<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,Hyperparams::FLOCK_SIZE);
-    genTransform<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,transforms,Hyperparams::FLOCK_SIZE);
+    //organize boids into grids
+    assignGrid<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids, mpd_gridIndices);
+    
+    thrust::device_ptr<Boid> d_thrustBoids(mpd_boids);
+    thrust::device_ptr<int> d_thrustIndices(mpd_gridIndices);
+    thrust::sort_by_key(d_thrustIndices, d_thrustIndices+Hyperparams::FLOCK_SIZE,d_thrustBoids);
+
+    assignGridStarts<<<1,1>>>(mpd_gridIndices, mpd_gridStarts);
+
+    //run boid computations
+    updateVeloc<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,mpd_gridIndices,mpd_gridStarts);
+    updatePosit<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids);
+    genTransform<<<(Hyperparams::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,transforms);
 };
 
 Flock::Flock() {
@@ -128,8 +184,14 @@ Flock::Flock() {
     cudaMalloc(&mpd_boids, Hyperparams::FLOCK_SIZE*sizeof(Boid));
     cudaMemcpy(mpd_boids, boids, Hyperparams::FLOCK_SIZE*sizeof(Boid), cudaMemcpyHostToDevice);
     free(boids);
+
+    cudaMalloc(&mpd_gridIndices, Hyperparams::FLOCK_SIZE*sizeof(int));
+
+    cudaMalloc(&mpd_gridStarts, Hyperparams::X_GRIDS*Hyperparams::Y_GRIDS*Hyperparams::Z_GRIDS*sizeof(int));
 };
 
 Flock::~Flock() {
     cudaFree(mpd_boids);
+    cudaFree(mpd_gridIndices);
+    cudaFree(mpd_gridStarts);
 };

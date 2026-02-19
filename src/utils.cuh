@@ -4,24 +4,38 @@
 #include <cuda/std/array>
 
 namespace Hyperparams {
-    constexpr float AVOID_FACTOR = .005f;
-    constexpr float MATCHING_FACTOR = .005f;
-    constexpr float CENTERING_FACTOR = .0005f;
-    constexpr float BUOY_SPEED = .002f;
+    constexpr float AVOID_FACTOR = 1.f;
+    constexpr float MATCHING_FACTOR = 1.f;
+    constexpr float CENTERING_FACTOR = .1f;
 
-    constexpr float  VISION_DISTANCE = .3f;
-    constexpr float  AVOID_DISTANCE = .03f;
-    constexpr float  MAX_SPEED = .005f;
-    constexpr float  MIN_SPEED = .003f;
+    constexpr float  VISION_DISTANCE = 2.f;
+    constexpr float  AVOID_DISTANCE = .5f;
+    constexpr float  MAX_SPEED = .5f;
+    constexpr float  MIN_SPEED = .3f;
 
-    constexpr float  TOP_BOUND = .95f;
-    constexpr float  RIGHT_BOUND = .95f;
-    constexpr float  FAR_BOUND = .95f;
-    constexpr float  BOTTOM_BOUND = -.95f;
-    constexpr float  LEFT_BOUND = -.95f;
-    constexpr float  NEAR_BOUND = -.95f;
+    constexpr float  TOP_BOUND = 100.f;
+    constexpr float  RIGHT_BOUND = 100.f;
+    constexpr float  FAR_BOUND = 100.f;
+    constexpr float  BOTTOM_BOUND = -100.f;
+    constexpr float  LEFT_BOUND = -100.f;
+    constexpr float  NEAR_BOUND = -100.f;
 
-    constexpr size_t FLOCK_SIZE = 50000;
+
+    constexpr size_t FLOCK_SIZE = 300000;
+
+    
+    constexpr unsigned int uint_ceil(float f)
+    {
+        const unsigned int i = static_cast<int>(f);
+        return f > i ? i + 1 : i;
+    }
+
+
+    constexpr unsigned int X_GRIDS = uint_ceil((Hyperparams::RIGHT_BOUND - Hyperparams::LEFT_BOUND) / Hyperparams::VISION_DISTANCE);
+    constexpr unsigned int Y_GRIDS = uint_ceil((Hyperparams::TOP_BOUND - Hyperparams::BOTTOM_BOUND) / Hyperparams::VISION_DISTANCE);
+    constexpr unsigned int Z_GRIDS = uint_ceil((Hyperparams::FAR_BOUND - Hyperparams::NEAR_BOUND) / Hyperparams::VISION_DISTANCE);
+
+    
 };
 
 namespace DeviceHelpers {
