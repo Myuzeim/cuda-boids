@@ -3,12 +3,12 @@
 #include <cstddef>
 #include <cuda/std/array>
 
-namespace Hyperparams {
+namespace Params {
     constexpr float AVOID_FACTOR = 2.f;
     constexpr float MATCHING_FACTOR = .5f;
-    constexpr float CENTERING_FACTOR = .1f;
+    constexpr float CENTERING_FACTOR = .15f;
 
-    constexpr float  VISION_DISTANCE = 2.f;
+    constexpr float  VISION_DISTANCE = 1.8f;
     constexpr float  AVOID_DISTANCE = .5f;
     constexpr float  MAX_SPEED = .7f;
     constexpr float  MIN_SPEED = .3f;
@@ -21,7 +21,7 @@ namespace Hyperparams {
     constexpr float  NEAR_BOUND = -75.f;
 
 
-    constexpr size_t FLOCK_SIZE = 500000;
+    constexpr size_t FLOCK_SIZE = 1000000;
 
     
     constexpr unsigned int uint_ceil(float f)
@@ -31,9 +31,9 @@ namespace Hyperparams {
     }
 
 
-    constexpr unsigned int X_GRIDS = uint_ceil((Hyperparams::RIGHT_BOUND - Hyperparams::LEFT_BOUND) / Hyperparams::VISION_DISTANCE);
-    constexpr unsigned int Y_GRIDS = uint_ceil((Hyperparams::TOP_BOUND - Hyperparams::BOTTOM_BOUND) / Hyperparams::VISION_DISTANCE);
-    constexpr unsigned int Z_GRIDS = uint_ceil((Hyperparams::FAR_BOUND - Hyperparams::NEAR_BOUND) / Hyperparams::VISION_DISTANCE);
+    constexpr unsigned int X_GRIDS = uint_ceil((Params::RIGHT_BOUND - Params::LEFT_BOUND) / Params::VISION_DISTANCE);
+    constexpr unsigned int Y_GRIDS = uint_ceil((Params::TOP_BOUND - Params::BOTTOM_BOUND) / Params::VISION_DISTANCE);
+    constexpr unsigned int Z_GRIDS = uint_ceil((Params::FAR_BOUND - Params::NEAR_BOUND) / Params::VISION_DISTANCE);
 
     
 };

@@ -25,11 +25,11 @@ class Boid {
             m_posit.z += m_veloc.z; 
 
             //keep bounded, just teleport to other side
-            m_posit.x = m_posit.x > Hyperparams::RIGHT_BOUND ? m_posit.x - (Hyperparams::RIGHT_BOUND - Hyperparams::LEFT_BOUND) : m_posit.x;
-            m_posit.x = m_posit.x < Hyperparams::LEFT_BOUND ? m_posit.x + (Hyperparams::RIGHT_BOUND - Hyperparams::LEFT_BOUND) : m_posit.x;
-            m_posit.y = m_posit.y > Hyperparams::TOP_BOUND ? m_posit.y - (Hyperparams::TOP_BOUND - Hyperparams::BOTTOM_BOUND) : m_posit.y;
-            m_posit.y = m_posit.y < Hyperparams::BOTTOM_BOUND ? m_posit.y + (Hyperparams::TOP_BOUND - Hyperparams::BOTTOM_BOUND) : m_posit.y;
-            m_posit.z = m_posit.z > Hyperparams::FAR_BOUND ? m_posit.z - (Hyperparams::FAR_BOUND - Hyperparams::NEAR_BOUND) : m_posit.z;
-            m_posit.z = m_posit.z < Hyperparams::NEAR_BOUND ? m_posit.z + (Hyperparams::FAR_BOUND - Hyperparams::NEAR_BOUND) : m_posit.z;
+            m_posit.x = m_posit.x > Params::RIGHT_BOUND ? m_posit.x - (Params::RIGHT_BOUND - Params::LEFT_BOUND) : m_posit.x;
+            m_posit.x = m_posit.x < Params::LEFT_BOUND ? m_posit.x + (Params::RIGHT_BOUND - Params::LEFT_BOUND) : m_posit.x;
+            m_posit.y = m_posit.y > Params::TOP_BOUND ? m_posit.y - (Params::TOP_BOUND - Params::BOTTOM_BOUND) : m_posit.y;
+            m_posit.y = m_posit.y < Params::BOTTOM_BOUND ? m_posit.y + (Params::TOP_BOUND - Params::BOTTOM_BOUND) : m_posit.y;
+            m_posit.z = m_posit.z > Params::FAR_BOUND ? m_posit.z - (Params::FAR_BOUND - Params::NEAR_BOUND) : m_posit.z;
+            m_posit.z = m_posit.z < Params::NEAR_BOUND ? m_posit.z + (Params::FAR_BOUND - Params::NEAR_BOUND) : m_posit.z;
         };
 };

@@ -145,7 +145,7 @@ int main() {
 
     glBindBuffer(GL_ARRAY_BUFFER, instVBO);
     size_t matSize = 4*sizeof(float4);
-    glBufferData(GL_ARRAY_BUFFER, matSize*Hyperparams::FLOCK_SIZE,nullptr,GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, matSize*Params::FLOCK_SIZE,nullptr,GL_DYNAMIC_DRAW);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, matSize , nullptr);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, matSize , (void*)(1*sizeof(float4)));
@@ -209,7 +209,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(program);
         glBindVertexArray(boidVAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, 12, Hyperparams::FLOCK_SIZE);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 12, Params::FLOCK_SIZE);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
