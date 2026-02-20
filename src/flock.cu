@@ -39,14 +39,20 @@ __global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts, int* boidI
 
         int boidIdx = boidIndices[idx];
         
+        // Get 3D grid space
+        int gx = grids[idx] % Params::X_GRIDS;
+        int gy = (grids[idx] / Params::X_GRIDS) % Params::Y_GRIDS;
+        int gz = grids[idx] / (Params::X_GRIDS * Params::Y_GRIDS);
+        
         //surrounding 9 grids
         for (int i = -1; i <= 1; i++)
             for (int j = -1; j <= 1; j++)
                 for (int k = -1; k <= 1; k++)
                 {
-                    int neighborGridIdx = grids[idx] + i + j * Params::X_GRIDS + k * Params::X_GRIDS * Params::Y_GRIDS;
-                    if(neighborGridIdx < 0 || neighborGridIdx >= Params::X_GRIDS * Params::Y_GRIDS * Params::Z_GRIDS)
-                        continue;
+                    int nx = (gx + i + Params::X_GRIDS) % Params::X_GRIDS;
+                    int ny = (gy + j + Params::Y_GRIDS) % Params::Y_GRIDS;
+                    int nz = (gz + k + Params::Z_GRIDS) % Params::Z_GRIDS;
+                    int neighborGridIdx = nx + ny * Params::X_GRIDS + nz * Params::X_GRIDS * Params::Y_GRIDS;
 
                     //empty cell
                     if(gridStarts[neighborGridIdx] >= Params::FLOCK_SIZE)
@@ -59,7 +65,19 @@ __global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts, int* boidI
                             break;
 
                         //get data for later
-                        float3 d = DeviceHelpers::sub(boids[boidIdx].getPosit(), boids[boidIndices[neighborIdx]].getPosit());
+                        float3 neighborPos = boids[boidIndices[neighborIdx]].getPosit();
+                        float3 myPos = boids[boidIdx].getPosit();
+
+                        float3 d = DeviceHelpers::sub(myPos, neighborPos);
+
+                        // for each axis: if the gap is more than half the world, the short path is through the wrap
+                        if (d.x >  Params::WORLD_WIDTH * 0.5f) d.x -= Params::WORLD_WIDTH;
+                        if (d.x < -Params::WORLD_WIDTH * 0.5f) d.x += Params::WORLD_WIDTH;
+                        if (d.y >  Params::WORLD_HEIGHT * 0.5f) d.y -= Params::WORLD_HEIGHT;
+                        if (d.y < -Params::WORLD_HEIGHT * 0.5f) d.y += Params::WORLD_HEIGHT;
+                        if (d.z >  Params::WORLD_DEPTH * 0.5f) d.z -= Params::WORLD_DEPTH;
+                        if (d.z < -Params::WORLD_DEPTH * 0.5f) d.z += Params::WORLD_DEPTH;
+
                         float sqDist = d.x*d.x + d.y*d.y + d.z*d.z;
 
                         if (sqDist < Params::AVOID_DISTANCE*Params::AVOID_DISTANCE) {
@@ -67,7 +85,8 @@ __global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts, int* boidI
                             accum.close = DeviceHelpers::add(accum.close, DeviceHelpers::sub(boids[boidIdx].getPosit(),boids[boidIndices[neighborIdx]].getPosit()));
                         } else if (sqDist < Params::VISION_DISTANCE*Params::VISION_DISTANCE) {
                             // Centering/Matching
-                            accum.pos_avg = DeviceHelpers::add(accum.pos_avg, boids[boidIndices[neighborIdx]].getPosit());
+                            float3 wrappedNeighborPos = { myPos.x - d.x, myPos.y - d.y, myPos.z - d.z };
+                            accum.pos_avg = DeviceHelpers::add(accum.pos_avg, wrappedNeighborPos);
                             accum.vel_avg = DeviceHelpers::add(accum.vel_avg, boids[boidIndices[neighborIdx]].getVeloc());
                             accum.neighboring_boids += 1;
                         }

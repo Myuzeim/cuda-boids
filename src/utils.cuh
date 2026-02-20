@@ -35,7 +35,9 @@ namespace Params {
     constexpr unsigned int Y_GRIDS = uint_ceil((Params::TOP_BOUND - Params::BOTTOM_BOUND) / Params::VISION_DISTANCE);
     constexpr unsigned int Z_GRIDS = uint_ceil((Params::FAR_BOUND - Params::NEAR_BOUND) / Params::VISION_DISTANCE);
 
-    
+    constexpr float WORLD_WIDTH = Params::RIGHT_BOUND - Params::LEFT_BOUND;
+    constexpr float WORLD_HEIGHT = Params::TOP_BOUND - Params::BOTTOM_BOUND;
+    constexpr float WORLD_DEPTH = Params::FAR_BOUND - Params::NEAR_BOUND;
 };
 
 namespace DeviceHelpers {
