@@ -60,7 +60,7 @@ int main() {
     
     // Set up camera
     struct CamState {
-        float yaw = 0.f, pitch = 0.3f, dist = 300.f;
+        float yaw = 0.f, pitch = 0.0f, dist = 500.f;
         double lastX = 0, lastY = 0;
         bool dragging = false;
     };
@@ -87,7 +87,7 @@ int main() {
     glfwSetScrollCallback(window, [](GLFWwindow* w, double, double dy) {
         auto& c = *(CamState*)glfwGetWindowUserPointer(w);
         c.dist *= (float)std::pow(0.9, dy); // scroll up = zoom in
-        c.dist  = std::clamp(c.dist, 0.5f, 500.f);
+        c.dist  = std::clamp(c.dist, 0.5f, 700.f);
     });
 
     // Compile shaders

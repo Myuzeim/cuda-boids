@@ -30,13 +30,12 @@ Boid Flock::randomBoid(std::mt19937& rng) {
     return Boid(posit, veloc);
 };
 
-__global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts, int* boidIndices) {
+__global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts) {
     unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
     if (idx < Params::FLOCK_SIZE) {
         Accumulator accum;
 
-        int boidIdx = boidIndices[idx];
-        Boid b = boids[boidIdx];
+        Boid b = boids[idx];
         
         // Get 3D grid space
         int gx = grids[idx] % Params::X_GRIDS;
@@ -63,7 +62,7 @@ __global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts, int* boidI
                         if(grids[neighborIdx] != neighborGridIdx)
                             break;
 
-                        Boid neighorBoid = boids[boidIndices[neighborIdx]];
+                        Boid neighorBoid = boids[neighborIdx];
 
                         //get data for later
                         float3 neighborPos = neighorBoid.getPosit();
@@ -129,7 +128,7 @@ __global__ void updateVeloc(Boid* boids, int* grids, int* gridStarts, int* boidI
             newVeloc.z = newVeloc.z * invSpeed * Params::MAX_SPEED;
         }
 
-        boids[boidIdx].setNewVeloc(newVeloc);
+        boids[idx].setNewVeloc(newVeloc);
     }
 };
 
@@ -160,9 +159,19 @@ __global__ void assignGrid(Boid* boids, int* gridIndices) {
     }
 };
 
+__global__ void organizeBoidsByGrid(Boid* dst, Boid* src, int* boidIndices) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if (i < Params::FLOCK_SIZE) {
+        dst[i] = src[boidIndices[i]];
+    }
+}
+
 void Flock::step(float4* transforms) {
     //organize boids into grids
-    assignGrid<<<(Params::FLOCK_SIZE + 255)/256,256>>>(mpd_boids, mpd_gridIndices);
+    if(m_secondBoids)
+        assignGrid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids2, mpd_gridIndices);
+    else
+        assignGrid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1 )/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids, mpd_gridIndices);
 
     thrust::device_ptr<int> d_thrustBoidIndices(mpd_boidIndices);
     thrust::device_ptr<int> d_thrustGridIndices(mpd_gridIndices);
@@ -176,14 +185,31 @@ void Flock::step(float4* transforms) {
                     thrust::counting_iterator<int>(Params::X_GRIDS*Params::Y_GRIDS*Params::Z_GRIDS),
                     d_thrustGridStarts);
 
+    //rearrange boids
+    if(m_secondBoids) {
+        organizeBoidsByGrid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids, mpd_boids2, mpd_boidIndices);
+    } else {
+        organizeBoidsByGrid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids2, mpd_boids, mpd_boidIndices);
+    }
 
     //run boid computations
-    updateVeloc<<<(Params::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,mpd_gridIndices,mpd_gridStarts,mpd_boidIndices);
-    updatePosit<<<(Params::FLOCK_SIZE + 255)/256,256>>>(mpd_boids);
-    genTransform<<<(Params::FLOCK_SIZE + 255)/256,256>>>(mpd_boids,transforms);
+    if(m_secondBoids) {
+        updateVeloc<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids,mpd_gridIndices,mpd_gridStarts);
+        updatePosit<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids);
+        genTransform<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids,transforms);
+    } else {
+        updateVeloc<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids2,mpd_gridIndices,mpd_gridStarts);
+        updatePosit<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids2);
+        genTransform<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_boids2,transforms);
+    }
+
+    m_secondBoids = !m_secondBoids;
 };
 
 Flock::Flock() {
+    m_secondBoids = false;
+
+
     Boid* boids = (Boid*)malloc(Params::FLOCK_SIZE*sizeof(Boid));
 
     std::mt19937 rng(std::random_device{}());
@@ -195,6 +221,8 @@ Flock::Flock() {
     cudaMemcpy(mpd_boids, boids, Params::FLOCK_SIZE*sizeof(Boid), cudaMemcpyHostToDevice);
     free(boids);
 
+    cudaMalloc(&mpd_boids2, Params::FLOCK_SIZE*sizeof(Boid));
+
     cudaMalloc(&mpd_gridIndices, Params::FLOCK_SIZE*sizeof(int));
 
     cudaMalloc(&mpd_gridStarts, Params::X_GRIDS*Params::Y_GRIDS*Params::Z_GRIDS*sizeof(int));
@@ -204,6 +232,7 @@ Flock::Flock() {
 
 Flock::~Flock() {
     cudaFree(mpd_boids);
+    cudaFree(mpd_boids2);
     cudaFree(mpd_gridIndices);
     cudaFree(mpd_gridStarts);
     cudaFree(mpd_boidIndices);

@@ -13,19 +13,16 @@ namespace Params {
     constexpr float  MAX_SPEED = .7f;
     constexpr float  MIN_SPEED = .3f;
 
-    constexpr float  TOP_BOUND = 120.f;
-    constexpr float  RIGHT_BOUND = 120.f;
-    constexpr float  FAR_BOUND = 120.f;
-    constexpr float  BOTTOM_BOUND = -120.f;
-    constexpr float  LEFT_BOUND = -120.f;
-    constexpr float  NEAR_BOUND = -120.f;
+    constexpr float  TOP_BOUND = 130.f;
+    constexpr float  RIGHT_BOUND = 130.f;
+    constexpr float  FAR_BOUND = 130.f;
+    constexpr float  BOTTOM_BOUND = -130.f;
+    constexpr float  LEFT_BOUND = -130.f;
+    constexpr float  NEAR_BOUND = -130.f;
 
 
     constexpr int FLOCK_SIZE = 2000000;
-    constexpr int CHUNK_SIZE = 256;
-
-    // number of boids to search for in each surrounding cell
-    //constexpr int VISIBLE_BOIDS_PER_CELL = 8;
+    constexpr int BLOCK_SIZE = 256;
     
     constexpr unsigned int uint_ceil(float f)
     {
