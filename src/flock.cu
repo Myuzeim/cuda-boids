@@ -156,7 +156,7 @@ __global__ void assignGrid(Boid* boids, int* gridIndices) {
         unsigned int y = cuda::std::floor((boids[i].getPosit().y - Params::BOTTOM_BOUND) / Params::VISION_DISTANCE);
         unsigned int z = cuda::std::floor((boids[i].getPosit().z - Params::NEAR_BOUND) / Params::VISION_DISTANCE);
 
-        gridIndices[i] = x + y * Params::X_GRIDS + z * Params::X_GRIDS * Params::Z_GRIDS;
+        gridIndices[i] = x + y * Params::X_GRIDS + z * Params::X_GRIDS * Params::Y_GRIDS;
     }
 };
 

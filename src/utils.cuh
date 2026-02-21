@@ -22,6 +22,7 @@ namespace Params {
 
 
     constexpr int FLOCK_SIZE = 2000000;
+    constexpr int CHUNK_SIZE = 256;
 
     // number of boids to search for in each surrounding cell
     //constexpr int VISIBLE_BOIDS_PER_CELL = 8;
@@ -36,6 +37,7 @@ namespace Params {
     constexpr unsigned int X_GRIDS = uint_ceil((Params::RIGHT_BOUND - Params::LEFT_BOUND) / Params::VISION_DISTANCE);
     constexpr unsigned int Y_GRIDS = uint_ceil((Params::TOP_BOUND - Params::BOTTOM_BOUND) / Params::VISION_DISTANCE);
     constexpr unsigned int Z_GRIDS = uint_ceil((Params::FAR_BOUND - Params::NEAR_BOUND) / Params::VISION_DISTANCE);
+    constexpr unsigned int AREA_GRIDS = X_GRIDS * Y_GRIDS * Z_GRIDS;
 
     constexpr float WORLD_WIDTH = Params::RIGHT_BOUND - Params::LEFT_BOUND;
     constexpr float WORLD_HEIGHT = Params::TOP_BOUND - Params::BOTTOM_BOUND;
