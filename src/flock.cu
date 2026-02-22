@@ -35,14 +35,13 @@ float3 Flock::randomPos(std::mt19937& rng) {
     return posit;
 }
 
-__global__ void calcNewVeloc(float3* pos, float3* vel, float3* newVel, int* grids, int* gridStarts, int* boidIndices) {
+__global__ void calcNewVeloc(float3* pos, float3* vel, float3* newVel, int* grids, int* gridStarts) {
     unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
     if (idx < Params::FLOCK_SIZE) {
         Accumulator accum;
 
-        int boidIdx = boidIndices[idx];
         //get data for later
-        float3 boidPos = pos[boidIdx];
+        float3 boidPos = pos[idx];
         
         // Get 3D grid space
         int gx = grids[idx] % Params::X_GRIDS;
@@ -69,7 +68,7 @@ __global__ void calcNewVeloc(float3* pos, float3* vel, float3* newVel, int* grid
                         if(grids[neighborIdx] != neighborGridIdx)
                             break;
 
-                        float3 neighborPos = pos[boidIndices[neighborIdx]];
+                        float3 neighborPos = pos[neighborIdx];
 
                         float3 d = DeviceHelpers::sub(boidPos, neighborPos);
 
@@ -90,13 +89,13 @@ __global__ void calcNewVeloc(float3* pos, float3* vel, float3* newVel, int* grid
                             // Centering/Matching
                             float3 wrappedNeighborPos = { boidPos.x - d.x, boidPos.y - d.y, boidPos.z - d.z };
                             accum.pos_avg = DeviceHelpers::add(accum.pos_avg, wrappedNeighborPos);
-                            accum.vel_avg = DeviceHelpers::add(accum.vel_avg, vel[boidIndices[neighborIdx]]);
+                            accum.vel_avg = DeviceHelpers::add(accum.vel_avg, vel[neighborIdx]);
                             accum.neighboring_boids += 1;
                         }
                     }
                 }
         
-        float3 boidVel = vel[boidIdx];
+        float3 boidVel = vel[idx];
 
         if (accum.neighboring_boids > 0) {
             //add centering/matching
@@ -133,7 +132,7 @@ __global__ void calcNewVeloc(float3* pos, float3* vel, float3* newVel, int* grid
         }
 
         // move boid
-        newVel[boidIdx] = boidVel;
+        newVel[idx] = boidVel;
     }
 };
 
@@ -170,9 +169,25 @@ __global__ void updateBoid(float3* pos, float3* vel, float3* newVel) {
     }
 }
 
+__global__ void organizeBoidsByGrid(float3* dstPos, float3* dstVel, float3* srcPos, float3* srcVel, int* boidIndices) {
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < Params::FLOCK_SIZE) {
+        int src = boidIndices[i];
+        dstPos[i] = srcPos[src];
+        dstVel[i] = srcVel[src];
+    }
+}
+
+__global__ void boidsTransfer(float3* dstPos, float3* dstVel, float3* srcPos, float3* srcVel) {
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < Params::FLOCK_SIZE) {
+        dstPos[i] = srcPos[i];
+        dstVel[i] = srcVel[i];
+    }
+}
+
 void Flock::step(float3* cudaPos, float3* cudaVel) {
     //organize boids into grids
-    
     assignGrid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1 )/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(cudaPos, mpd_gridIndices);
 
     thrust::device_ptr<int> d_thrustBoidIndices(mpd_boidIndices);
@@ -187,8 +202,12 @@ void Flock::step(float3* cudaPos, float3* cudaVel) {
                     thrust::counting_iterator<int>(Params::X_GRIDS*Params::Y_GRIDS*Params::Z_GRIDS),
                     d_thrustGridStarts);
 
+    //reorganize boids;
+    organizeBoidsByGrid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1 )/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(mpd_posBuffer, mpd_velBuffer, cudaPos, cudaVel, mpd_boidIndices);
+    boidsTransfer<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1 )/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(cudaPos, cudaVel, mpd_posBuffer, mpd_velBuffer);
+
     //run boid computations
-    calcNewVeloc<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(cudaPos, cudaVel, mpd_newVels,mpd_gridIndices,mpd_gridStarts, mpd_boidIndices);
+    calcNewVeloc<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(cudaPos, cudaVel, mpd_newVels,mpd_gridIndices,mpd_gridStarts);
     updateBoid<<<(Params::FLOCK_SIZE + Params::BLOCK_SIZE - 1)/Params::BLOCK_SIZE,Params::BLOCK_SIZE>>>(cudaPos, cudaVel, mpd_newVels);
 };
 
@@ -213,6 +232,8 @@ void Flock::genRand(float3* cudaPos, float3* cudaVel) {
 
 Flock::Flock() {
     cudaMalloc(&mpd_newVels, Params::FLOCK_SIZE*sizeof(float3));
+    cudaMalloc(&mpd_posBuffer, Params::FLOCK_SIZE*sizeof(float3));
+    cudaMalloc(&mpd_velBuffer, Params::FLOCK_SIZE*sizeof(float3));
     cudaMalloc(&mpd_gridIndices, Params::FLOCK_SIZE*sizeof(int));
 
     cudaMalloc(&mpd_gridStarts, Params::X_GRIDS*Params::Y_GRIDS*Params::Z_GRIDS*sizeof(int));
@@ -222,6 +243,8 @@ Flock::Flock() {
 
 Flock::~Flock() {
     cudaFree(mpd_newVels);
+    cudaFree(mpd_posBuffer);
+    cudaFree(mpd_velBuffer);
     cudaFree(mpd_gridIndices);
     cudaFree(mpd_gridStarts);
     cudaFree(mpd_boidIndices);

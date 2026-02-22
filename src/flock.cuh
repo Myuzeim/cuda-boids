@@ -11,6 +11,8 @@ class Flock {
         int* mpd_gridStarts;
         int* mpd_boidIndices;
         float3* mpd_newVels;
+        float3* mpd_velBuffer;
+        float3* mpd_posBuffer;
         float3 randomPos(std::mt19937& rng);
         float3 randomVel(std::mt19937& rng);
 
