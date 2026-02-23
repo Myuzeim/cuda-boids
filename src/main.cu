@@ -15,13 +15,16 @@ const char* vertSrc = "#version 330 core\n"
     "layout(location = 2) in float y;\n"
     "layout(location = 3) in float z;\n"
     "uniform mat4 viewProj;\n"
+    "out vec3 vColor;\n"
     "void main() { \n"
+    "   vColor = vec3((x / 300.0) + 0.5, (y / 300.0) + 0.5, (z / 300.0) + 0.5);\n"
     "   gl_Position = viewProj * vec4(x, y, z, 1.0);\n"
     "}\n";
 
 const char* fragSrc = "#version 330 core\n"
+    "in vec3 vColor;\n"
     "out vec4 FragColor;\n"
-    "void main() { FragColor = vec4(1.0, 0.5, 0.2, 1.0); }\n";
+    "void main() { FragColor = vec4(vColor, 1.0); }\n";
 
 // -- settings --
 const int    WINDOW_WIDTH  = 1280;
@@ -101,6 +104,9 @@ int main() {
         c.dist *= (float)std::pow(0.9, dy); // scroll up = zoom in
         c.dist  = std::clamp(c.dist, 0.5f, 700.f);
     });
+
+    //OpenGL stuff
+    glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
 
     // Compile shaders
     unsigned int vert = glCreateShader(GL_VERTEX_SHADER);
