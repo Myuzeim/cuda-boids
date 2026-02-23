@@ -1,6 +1,6 @@
 NVCC     := nvcc
 CC       := gcc
-CXXFLAGS := -std=c++20 -lineinfo
+NVCCFLAGS := -std=c++20 -lineinfo -arch=native -g
 LDFLAGS  := -lGL -lglfw
 IFLAGS   := -I./third_party/glad/include
 
@@ -20,10 +20,10 @@ $(OBJ_DIR)/glad.o: third_party/glad/src/glad.c | $(OBJ_DIR)
 	$(CC) $(IFLAGS) -std=c11 -c $< -o $@
 
 $(TARGET): $(OBJS) $(OBJ_DIR)/glad.o
-	$(NVCC) $(IFLAGS) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+	$(NVCC) $(IFLAGS) $(NVCCFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu | $(OBJ_DIR)
-	$(NVCC) $(IFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	$(NVCC) $(IFLAGS) $(NVCCFLAGS) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)

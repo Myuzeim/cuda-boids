@@ -1,6 +1,7 @@
 #pragma once
 
-#include "utils.cuh"
+#include "params.cuh"
+#include <array>
 #include <random>
 
 // a flock of boids
@@ -11,17 +12,14 @@ class Flock {
         int* mpd_gridStarts;
         int* mpd_gridEnds;
         int* mpd_boidIndices;
-        float4* mpd_newVels;
-        float4 randomPos(std::mt19937& rng);
-        float4 randomVel(std::mt19937& rng);
+        std::array<float,3> randomPos(std::mt19937& rng);
+        std::array<float,3> randomVel(std::mt19937& rng);
 
-        size_t m_xGrids;
-        size_t m_yGrids;
-        size_t m_zGrids;
     
     public:
-        void step(float4* cudaPos, float4* cudaVel, float4* toPos, float4* toVel);
-        void genRand(float4* cudaPos, float4* cudaVel);
+        //will copy new boid positions to "draw" params
+        void step(__half2* cudaXvx, __half2* cudaYvy, __half2* cudaZvz, __half2* drawXvx, __half2* drawYvy, __half2* drawZvz);
+        void genRand(__half2* cudaXvx, __half2* cudaYvy, __half2* cudaZvz);
         Flock();
         ~Flock();
 
